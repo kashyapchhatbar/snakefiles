@@ -1,0 +1,79 @@
+# Choose the aligner to use (STAR, tophat, kallisto)
+# This is my personal config, please change path
+STAR: '/provide/path'
+kallisto: '/provide/path'
+
+# Path to genome/transcriptome assembly (Provide !!null to fields which are 
+# unnecessary)
+STAR_assembly: '/provide/path'
+STAR_reference: '/provide/path'
+kallisto_assembly: '/provide/path'
+
+# Read trimming software
+trimmomatic: '/provide/path'
+adapters: '/provide/path'
+clip: '2:30:10' # ILLUMINACLIP paramter of trimmomatic
+
+# Picard tools path
+picardtools: '/provide/path'
+
+# Samtools path
+samtools: '/provide/path'
+samtools_header_sam: '/provide/path'
+
+# cramtools path
+cramtools: '/provide/path'
+
+# Java executable
+java: '/provide/path'
+
+# Trimmomatic parameters
+trimmomatic_parameters:
+- PE # PE (Paired-End) or SE (Single-END)
+- '-threads 24'
+- 'LEADING:3'
+- 'TRAILING:3'
+- 'SLIDINGWINDOW:4:30'
+- 'MINLEN:30'
+
+# cram to fastq parameters
+cram_to_fastq_parameters:
+- 'fastq'
+- '--reverse'
+- '--gzip'
+
+# STAR parameters (Add a few of your own if you like to)
+STAR_parameters:
+- '--runThreadN 24' # Number of processors for STAR
+- '--runMode alignReads' # STAR run mode
+- '--genomeDir /provide/path' # Genome Assembly
+- '--genomeLoad LoadAndKeep'
+- '--readFilesCommand zcat' # Specify if files are gzipped
+# Only align known transcripts from the supplied GTF file when creating assembly
+- '--outFilterIntronMotifs RemoveNoncanonicalUnannotated'
+- '--outSamtype BAM SortedByCoordinate' # STAR output type
+- '--limitBAMsortRAM 20000000000' # RAM for BAM sort
+- '--outReadsUnmapped Fastx' # Keep if you want unaligned reads for output
+
+# Bam to fastq parameters
+bam_to_fastq_parameters:
+- 'SamToFastq'
+- 'RE_REVERSE=true'
+
+# kallisto paramters
+kallisto_parameters:
+- 'quant'
+- '-t 10'
+- '-b 100'
+
+# samtools merge
+samtools_merge_parameters:
+- 'merge'
+- '-l 9' # compression best to preserve disk space
+- '--output-fmt CRAM' # Specify file format
+- '-r' # Attach RG tag to separate based on read groups
+- '-24' # Number of threads for samtools compression
+
+# Email settings
+email_from: 'username@domain'
+email_to: 'username@domain'

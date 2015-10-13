@@ -1,0 +1,27 @@
+#####################################################################################
+# This file needs to be coupled with Snakefile and config.yaml file 
+#####################################################################################
+
+# Project ID
+project_id: 'project'
+
+# Sanger IDs which are given from the sequencing centre
+sanger_ids:
+- 'test'
+
+# Name of samples corresponding to Sanger IDS
+samples:
+- 'sample'
+
+# Trimmed fastq file mapping of sample names and sanger IDs for STAR & kallisto input
+trimmed_fastq_input:
+  'sample':
+    one:
+      - 'test_1.trimmed.fastq.gz'      
+    two:
+      - 'test_2.trimmed.fastq.gz'      
+
+# Read groups information to be added in STAR
+read_groups:
+  'sample':
+    - 'ID:test CN:"Sequencing Centre" SM:sample LB:ample PL:ILLUMINA PU:ATCACG DT:2015-08-10'

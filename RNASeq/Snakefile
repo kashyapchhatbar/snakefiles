@@ -1,0 +1,155 @@
+#!/usr/bin/env python3
+
+import yaml
+import smtplib
+import os
+
+from email.mime.text import MIMEText
+
+with open('id_maps.yaml') as iH:
+  id_maps = yaml.load(iH.read())
+
+rule bam_to_fastq:
+  input:
+    expand("{sanger_id}_{pair}.fastq.gz", sanger_id=id_maps["sanger_ids"],
+            pair=['1','2'])  
+
+rule cram_to_fastq:
+  input:
+    expand("{sanger_id}_{pair}.fastq.gz", sanger_id=id_maps["sanger_ids"],
+            pair=['1','2'])  
+
+rule trim_fastq:
+  input:
+    expand("{sanger_id}_{pair}.trimmed.fastq.gz", 
+            sanger_id=id_maps["sanger_ids"],
+            pair=['1','2','1U','2U'])  
+
+rule STAR:
+  input:
+    expand("{sample}_STAR.Aligned.SortedByCoord.out.bam", 
+           sample=id_maps["samples"])
+
+rule kallisto:
+  input:
+    expand("{sample}_kallisto/abundance.tsv", sample=id_maps["samples"])
+
+rule run_bam_to_fastq:
+  input: "{sanger_id}.bam"
+  output:
+    one = "{sanger_id}_1.fastq.gz",
+    two = "{sanger_id}_2.fastq.gz"
+  params:
+    java = config["java"],
+    jar = config["picardtools"],
+    params = config["bam_to_fastq_parameters"]  
+  run:
+    shell("""{params.java} -jar {params.jar} {params.params} INPUT={input} \
+          FASTQ={output.one} SECOND_END_FASTQ={output.two}""")
+
+rule run_cram_to_fastq:
+  input: "{sanger_id}.cram"
+  output:
+    one = "{sanger_id}_1.fastq.gz",
+    two = "{sanger_id}_2.fastq.gz"
+  params:
+    java = config["java"],
+    jar = config["cramtools"],
+    params = config["cram_to_fastq_parameters"],
+    name = "{sanger_id}"  
+  run:
+    shell("""{params.java} -jar {params.jar} {params.params} -I {input} -F \
+          {params.name}""")
+
+rule run_trimmomatic:
+  input: 
+    one = "{sanger_id}_1.fastq.gz",
+    two = "{sanger_id}_2.fastq.gz"
+  params:
+    java = config["java"],
+    jar = config["trimmomatic"],
+    params = " ".join(config["trimmomatic_parameters"]),
+    clip = "ILLUMINACLIP:{}:{}".format(config["adapters"], config["clip"])
+  output:
+    one = "{sanger_id}_1.trimmed.fastq.gz",
+    two = "{sanger_id}_2.trimmed.fastq.gz",
+    fu = "{sanger_id}_1U.trimmed.fastq.gz",
+    ru = "{sanger_id}_2U.trimmed.fastq.gz"
+  run:
+    shell("""{params.java} -jar {params.jar} {params.params} {params.clip} \
+          {input.one} {input.two} {output.one} {output.two} {output.fu} \
+          {output.ru}""")
+
+rule run_STAR:
+  input:
+    one = lambda wildcards: ",".join(id_maps["trimmed_fastq_input"]\
+          [wildcards.sample]["one"]),
+    two = lambda wildcards: ",".join(id_maps["trimmed_fastq_input"]\
+          [wildcards.sample]["two"]) 
+  params:
+    executable = config["STAR"],
+    star = " ".join(config["STAR_parameters"]),
+    assembly = config["STAR_assembly"],
+    name = "{sample}_STAR.",
+    rg = lambda wildcards: " , ".join(id_maps["read_groups"][wildcards.sample])
+  output:
+    "{sample}.STAR.Aligned.SortedByCoord.out.bam"
+  run:
+    shell("""{parama.executable} {params.star} --genomeDir \
+          {config["STAR_assembly"]} --outFileNamePrefix {params.name} \
+          --readFilesIn {input.one} {input.two} --outSAMattrRGline \
+          {params.rg}""")
+    with open("""{id_maps["project_id"]}.STAR.bams""", "a") as wH:
+      print(os.path.abspath("{output}"), file=wH)
+
+rule run_kallisto:
+  input:
+    pairs = lambda wildcards: " ".join(
+      chain(*zip(id_maps["trimmed_fastq_input"][wildcards.sample]["one"], 
+                 id_maps["trimmed_fastq_input"][wildcards.sample]["two"])))
+  params:
+    executable = config["kallisto"],
+    kallisto = " ".join(config["kallisto_parameters"]),
+    assembly = config["kallisto_assembly"],
+    name = "{sample}_kallisto"
+  output:
+    "{sample}_kallisto/abundance.tsv"
+  run:
+    shell("""{params.executable} {params.kallisto} -i {params.assembly} -o \
+          {params.name} {input.pairs}""")
+
+rule merge_STAR_bams:
+  input:
+    """{id_maps["project_id"]}.STAR.bams"""
+  params:
+    executable = config["samtools"],
+    header = config["samtools_header_sam"],
+    params = " ".join(config["samtools_merge_parameters"]),
+    reference = config["STAR_reference"]
+  output:
+    id_maps["project_id"]+".STAR.cram"
+  run:
+    shell("""{params.executable} {params.params} -h {params.header} \
+          --reference {params.reference} {output}""")
+
+onsuccess:  
+  with open(log) as iH:
+    msg = MIMEText(iH.read())
+
+  msg["Subject"] = "{} success".format(id_maps["project_id"])
+  msg["From"] = config["email_from"]
+  msg["To"] = config["email_to"]
+
+  with smtplib.SMTP("localhost") as s:
+    s.send_message(msg)
+
+onerror:
+  with open(log) as iH:
+    msg = MIMEText(iH.read())
+
+  msg["Subject"] = "{} error".format(id_maps["project_id"])
+  msg["From"] = config["email_from"]
+  msg["To"] = config["email_to"]
+
+  with smtplib.SMTP("localhost") as s:
+    s.send_message(msg)
