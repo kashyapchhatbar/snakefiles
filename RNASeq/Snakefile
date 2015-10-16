@@ -86,12 +86,11 @@ rule run_trimmomatic:
           {output.ru} {params.clip} {params.second_params}""")
 
 rule run_STAR:
-  input:
-    one = lambda wildcards: ",".join(id_maps["trimmed_fastq_input"]\
-          [wildcards.sample]["one"]),
-    two = lambda wildcards: ",".join(id_maps["trimmed_fastq_input"]\
-          [wildcards.sample]["two"])
   params:
+    input_one = lambda wildcards: ",".join(id_maps["trimmed_fastq_input"]\
+          [wildcards.sample]["one"]),
+    input_two = lambda wildcards: ",".join(id_maps["trimmed_fastq_input"]\
+          [wildcards.sample]["two"]),
     executable = config["STAR"],
     star = " ".join(config["STAR_parameters"]),
     assembly = config["STAR_assembly"],
@@ -110,11 +109,10 @@ rule run_STAR:
 
 
 rule run_kallisto:
-  input:
+  params:
     pairs = lambda wildcards: " ".join(
       chain(*zip(id_maps["trimmed_fastq_input"][wildcards.sample]["one"],
-                 id_maps["trimmed_fastq_input"][wildcards.sample]["two"])))
-  params:
+                 id_maps["trimmed_fastq_input"][wildcards.sample]["two"]))),
     executable = config["kallisto"],
     kallisto = " ".join(config["kallisto_parameters"]),
     assembly = config["kallisto_assembly"],
@@ -123,7 +121,7 @@ rule run_kallisto:
     "{sample}_kallisto/abundance.tsv"
   run:
     shell("""{params.executable} {params.kallisto} -i {params.assembly} -o \
-          {params.name} {input.pairs}""")
+          {params.name} {params.pairs}""")
     with open("""{id_maps["project_id"]}.kallisto.tsvs""", "a") as wH:
       print(os.path.abspath("{output}"), "{sample}", sep="\t", file=wH)
     push = pb.push_note("Snakemake kallisto", "{sample} got over")
