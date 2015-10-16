@@ -28,9 +28,11 @@ cramtools: '/provide/path'
 java: '/provide/path'
 
 # Trimmomatic parameters
-trimmomatic_parameters:
+trimmomatic_first_parameters:
 - PE # PE (Paired-End) or SE (Single-END)
 - '-threads 24'
+
+trimmomatic_second_parameters:
 - 'LEADING:3'
 - 'TRAILING:3'
 - 'SLIDINGWINDOW:4:30'
@@ -77,3 +79,4 @@ samtools_merge_parameters:
 # Email settings
 email_from: 'username@domain'
 email_to: 'username@domain'
+pushbullet_key: !null
